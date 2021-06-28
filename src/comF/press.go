@@ -9,9 +9,9 @@ import (
 func Compress(data string) string {
 	var in bytes.Buffer
 	gz := gzip.NewWriter(&in)
-	gz.Write([]byte(data))
-	gz.Flush()
-	gz.Close()
+	_, _ = gz.Write([]byte(data))
+	_ = gz.Flush()
+	_ = gz.Close()
 	res := in.Bytes()
 	return string(res)
 }
