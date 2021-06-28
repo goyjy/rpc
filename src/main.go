@@ -1,16 +1,20 @@
 package main
 
-import "fmt"
+import (
+	httpRpc "http"
+	jsonRpc "json"
+	tcpRpc "tcp"
+)
 
 func main() {
-	f := Sequence()
+	httpRpc.Server()
+	httpRpc.Client()
 
-	fmt.Println(f())
-	fmt.Println(f())
+	tcpRpc.Server()
+	tcpRpc.Client()
 
-	f = Sequence()
-	fmt.Println(f())
-	fmt.Println(f())
+	jsonRpc.Server()
+	jsonRpc.Client()
 }
 
 func Sequence() func() int {
