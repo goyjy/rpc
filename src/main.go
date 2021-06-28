@@ -17,11 +17,3 @@ func main() {
 	jsonRpc.Client()
 }
 
-func Sequence() func() int {
-	x := 0
-	return func() int {
-		x++
-		return x*x
-	}
-}
-
