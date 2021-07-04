@@ -6,7 +6,6 @@ import (
 	"google.golang.org/grpc"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -37,20 +36,23 @@ func NewClient() {
 	// 调用的是UserServiceClient中的方法
 }
 
-func GRpcRequest() {
+func GRpcRequest(caps int) {
 	wait := sync.WaitGroup{}
-	var sum int32
-	for i := 0; i < 100; i++ {
+	sum := make([]time.Duration, caps)
+	for i := 0; i < caps; i++ {
 		wait.Add(1)
-		go func() {
+		go func(in int) {
 			begin := time.Now()
 			_, _ = client.Create(context.Background(), &User{Name: "ljq", Age: "25"})
 			//fmt.Printf("返回结果[%s] 耗时[%v]\n", resp.Message, time.Since(begin))
-			atomic.AddInt32(&sum, int32(time.Since(begin)))
+			sum[in] = time.Since(begin)
 			wait.Done()
-		}()
+		}(i)
 	}
 	wait.Wait()
-	sum = sum / 100
-	fmt.Println("gRpc耗时 ", time.Duration(sum))
+	var all time.Duration
+	for _, t := range sum {
+		all += t
+	}
+	fmt.Printf("gRpc耗时 [%v]\n", all/time.Duration(caps))
 }
