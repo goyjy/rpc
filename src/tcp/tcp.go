@@ -40,10 +40,10 @@ func Client() {
 	var args = Args{In:"tcp test"}
 	var reply Reply
 
-	var begin, end time.Time
-	begin = time.Now()
+	begin := time.Now()
 	client, _ := rpc.Dial("tcp", "127.0.0.1:8070")
-	client.Call("RpcHandle.RpcFunc", &args, &reply)
-	end = time.Now()
-	fmt.Printf("返回结果[%s] 耗时[%v]\n", reply.Out, end.Sub(begin))
+	for i := 0; i < 100; i++ {
+		client.Call("RpcHandle.RpcFunc", &args, &reply)
+	}
+	fmt.Printf("返回结果[%s] 耗时[%v]\n", reply.Out, time.Since(begin)/100)
 }

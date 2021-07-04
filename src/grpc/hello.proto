@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package g;
+
+// 定义一个服务
+service UserService {
+  // 定义服务中的某个方法 请求参数User 返回值Resp
+  rpc Create (User) returns (Resp) {
+  }
+}
+// 请求参数
+message User {
+  string name = 1;
+  string age = 2;
+}
+// 返回值
+message Resp {
+  string message = 1;
+}
