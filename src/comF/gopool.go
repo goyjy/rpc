@@ -3,6 +3,13 @@ package comF
 import (
 	"fmt"
 	"sync/atomic"
+	"time"
+)
+
+const (
+	noStop   = 0
+	stop     = 1
+	stopTime = time.Second * 7
 )
 
 type AsyncF func(args ...interface{})
@@ -16,8 +23,8 @@ func NewPool(init, max int) Pool {
 		id:       GetUUID(),
 		init:     init,
 		max:      max,
-		taskChan: make(chan TaskArgs, max*10),
-		workChan: make(chan chan TaskArgs, max),
+		taskChan: make(chan *TaskArgs, max*10),
+		workChan: make(chan *workerTool, max),
 		stop:     make(chan bool),
 	}
 
@@ -25,12 +32,13 @@ func NewPool(init, max int) Pool {
 		worker := worker{
 			id:       i,
 			dispatch: &dispatch,
-			workChan: make(chan TaskArgs),
-			stop:     make(chan bool),
+			workTool: &workerTool{
+				workChan: make(chan *TaskArgs),
+				stop:     noStop,
+			},
 		}
-		dispatch.workers = append(dispatch.workers, worker)
-		dispatch.cutCount++
-		go worker.run(nil)
+		atomic.AddInt32(&dispatch.cutCount, 1)
+		go worker.run(nil, true)
 	}
 
 	go dispatch.dispatch()
@@ -40,10 +48,7 @@ func NewPool(init, max int) Pool {
 
 func DestroyPool(pool Pool) {
 	p := pool.(*dispatcher)
-	for _, v := range p.workers {
-		v.stop <- true
-	}
-	p.stop <- true
+	close(p.stop)
 }
 
 type TaskArgs struct {
@@ -56,10 +61,8 @@ type dispatcher struct {
 	init      int
 	max       int
 	cutCount  int32
-	busyCount int32
-	taskChan  chan TaskArgs
-	workChan  chan chan TaskArgs
-	workers   []worker
+	taskChan  chan *TaskArgs
+	workChan  chan *workerTool
 	stop      chan bool
 }
 
@@ -67,24 +70,33 @@ func (d *dispatcher) dispatch() {
 	for {
 		select {
 		case v := <- d.taskChan:
-			if atomic.LoadInt32(&d.busyCount) >= d.cutCount {
-				if d.cutCount >= int32(d.max) {
-					fmt.Println("max workers wait to run task")
-				} else {
-					w := worker{
-						id:       int(d.cutCount + 1),
-						dispatch: d,
-						workChan: make(chan TaskArgs),
-						stop:     make(chan bool),
-					}
-					d.workers = append(d.workers, w)
-					d.cutCount++
-					go w.run(&v)
+			select {
+			case work := <- d.workChan:
+				if atomic.LoadInt32(&work.stop) == noStop {
+					work.workChan <- v
 					continue
 				}
+			default:
 			}
-			work := <- d.workChan
-			work <- v
+			if atomic.LoadInt32(&d.cutCount) < int32(d.max) {
+				w := worker{
+					id:       int(GetWorkId()),
+					dispatch: d,
+					workTool: &workerTool{
+						workChan: make(chan *TaskArgs),
+						stop:     noStop,
+					},
+				}
+				atomic.AddInt32(&d.cutCount, 1)
+				go w.run(v, false)
+				continue
+			}
+			for work := range d.workChan {
+				if atomic.LoadInt32(&work.stop) == noStop {
+					work.workChan <- v
+					break
+				}
+			}
 		case <- d.stop:
 			goto EXIT
 		}
@@ -95,7 +107,7 @@ EXIT:
 }
 
 func (d *dispatcher) NewAsyncTask(ex AsyncF, args ...interface{}) (success bool) {
-	task := TaskArgs{
+	task := &TaskArgs{
 		Ex:   ex,
 		Args: args,
 	}
@@ -108,29 +120,49 @@ func (d *dispatcher) NewAsyncTask(ex AsyncF, args ...interface{}) (success bool)
 type worker struct {
 	id       int
 	dispatch *dispatcher
-	workChan chan TaskArgs
-	stop     chan bool
+	workTool *workerTool
 }
 
-func (w *worker) run(t *TaskArgs) {
-	fmt.Println("创建worker", w.id)
+type workerTool struct {
+	workChan chan *TaskArgs
+	stop     int32
+}
+
+func (w *worker) run(t *TaskArgs, isInit bool) {
+	fmt.Println("创建worker: ", w.id)
 	if t != nil {
-		atomic.AddInt32(&w.dispatch.busyCount, 1)
 		t.Ex(t.Args...)
-		atomic.AddInt32(&w.dispatch.busyCount, -1)
 	}
-	for {
-		w.dispatch.workChan <- w.workChan
-		select {
-		case task := <- w.workChan:
-			atomic.AddInt32(&w.dispatch.busyCount, 1)
-			task.Ex(task.Args...)
-			atomic.AddInt32(&w.dispatch.busyCount, -1)
-		case <- w.stop:
-			goto EXIT
+	if isInit {
+		for {
+			w.dispatch.workChan <- w.workTool
+			select {
+			case task := <- w.workTool.workChan:
+				task.Ex(task.Args...)
+			case <- w.dispatch.stop:
+				goto EXIT
+			}
+		}
+	} else {
+		for {
+			w.dispatch.workChan <- w.workTool
+			select {
+			case task := <- w.workTool.workChan:
+				task.Ex(task.Args...)
+			case <- w.dispatch.stop:
+				goto EXIT
+			case <- time.After(stopTime):
+				atomic.AddInt32(&w.workTool.stop, stop)
+				atomic.AddInt32(&w.dispatch.cutCount, -1)
+				select {
+				case task := <- w.workTool.workChan:
+					task.Ex(task.Args...)
+				default:
+					goto EXIT
+				}
+			}
 		}
 	}
-
 EXIT:
 	fmt.Printf("退出worker ID:%d\n", w.id)
 }

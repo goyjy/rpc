@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var client UserServiceClient
+
 type server struct {
 
 }
@@ -25,19 +27,27 @@ func Server() {
 	}()
 }
 
-func Client() {
+func NewClient() {
 	// grpc.WithInsecure() 禁用传输安全性
 	conn, _ := grpc.Dial("127.0.0.1:8050", grpc.WithInsecure())
-	defer conn.Close()
 	// 创建一个client
-	client := NewUserServiceClient(conn)
+	client = NewUserServiceClient(conn)
 	// 调用的是UserServiceClient中的方法
+}
 
-	resp := &Resp{}
-	begin := time.Now()
-	for i := 0; i < 100; i++ {
-		resp, _ = client.Create(context.Background(), &User{Name: "ljq", Age: "25"})
+func GRpcRequest() {
+	for i := 0; i < 10; i++ {
+		go func() {
+			begin := time.Now()
+			resp, err := client.Create(context.Background(), &User{Name: "ljq", Age: "25"})
+			if err != nil {
+				fmt.Println("请求失败 ", err)
+			} else {
+				fmt.Printf("返回结果[%s] 耗时[%v]\n",
+					resp.Message, time.Since(begin))
+			}
+		}()
 	}
 
-	fmt.Printf("返回结果[%s] 耗时[%v]\n", resp.Message, time.Since(begin)/100)
+
 }

@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+var client *rpc.Client
+
 type RpcHandle int
 
 func Server() {
@@ -36,14 +38,16 @@ func (r RpcHandle) RpcFunc(args *Args, reply *Reply) error {
 	return nil
 }
 
-func Client() {
-	var args = Args{In:"tcp test"}
-	var reply Reply
+func NewClient() {
+	client, _ = rpc.Dial("tcp", "127.0.0.1:8070")
+}
 
-	begin := time.Now()
-	client, _ := rpc.Dial("tcp", "127.0.0.1:8070")
-	for i := 0; i < 100; i++ {
+func TRpcTest() {
+	for i := 0; i < 10; i++ {
+		var args = Args{In:"tcp test"}
+		var reply Reply
+		begin := time.Now()
 		client.Call("RpcHandle.RpcFunc", &args, &reply)
+		fmt.Printf("返回结果[%s] 耗时[%v]\n", reply.Out, time.Since(begin))
 	}
-	fmt.Printf("返回结果[%s] 耗时[%v]\n", reply.Out, time.Since(begin)/100)
 }

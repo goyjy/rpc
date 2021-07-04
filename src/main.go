@@ -8,18 +8,24 @@ import (
 )
 
 func main() {
-	tcpRpc.Server()
-	jsonRpc.Server()
 	g.Server()
+	g.NewClient()
+	g.GRpcRequest()
 
 	time.Sleep(time.Second)
 
-	tcpRpc.Client()
+	jsonRpc.Server()
+	jsonRpc.NewClient()
+	jsonRpc.JRpcTest()
+
 	time.Sleep(time.Second)
 
-	jsonRpc.Client()
-	time.Sleep(time.Second)
+	tcpRpc.Server()
+	tcpRpc.NewClient()
+	tcpRpc.TRpcTest()
 
-	g.Client()
+	time.Sleep(time.Second)
 }
+
+
 
