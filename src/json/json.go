@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -43,13 +45,21 @@ func NewClient() {
 }
 
 func JRpcTest() {
-	for i := 0; i < 10; i++ {
+	wait := sync.WaitGroup{}
+	var sum int32
+	for i := 0; i < 100; i++ {
+		wait.Add(1)
 		go func() {
 			var args = Args{In:"json test"}
 			var reply Reply
 			begin := time.Now()
 			client.Call("JsonHandle.RpcFunc", &args, &reply)
-			fmt.Printf("返回结果[%s] 耗时[%v]\n", reply.Out, time.Since(begin))
+			//fmt.Printf("返回结果[%s] 耗时[%v]\n", reply.Out, time.Since(begin))
+			atomic.AddInt32(&sum, int32(time.Since(begin)))
+			wait.Done()
 		}()
 	}
+	wait.Wait()
+	sum = sum / 100
+	fmt.Println("jRpc耗时 ", time.Duration(sum))
 }

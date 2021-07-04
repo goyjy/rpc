@@ -10,21 +10,20 @@ import (
 func main() {
 	g.Server()
 	g.NewClient()
-	g.GRpcRequest()
-
-	time.Sleep(time.Second)
 
 	jsonRpc.Server()
 	jsonRpc.NewClient()
-	jsonRpc.JRpcTest()
-
-	time.Sleep(time.Second)
 
 	tcpRpc.Server()
 	tcpRpc.NewClient()
-	tcpRpc.TRpcTest()
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 3)
+
+	go g.GRpcRequest()
+	go jsonRpc.JRpcTest()
+	go tcpRpc.TRpcTest()
+
+	time.Sleep(time.Second * 3)
 }
 
 

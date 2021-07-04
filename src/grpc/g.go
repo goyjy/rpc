@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"google.golang.org/grpc"
 	"net"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -36,18 +38,19 @@ func NewClient() {
 }
 
 func GRpcRequest() {
-	for i := 0; i < 10; i++ {
+	wait := sync.WaitGroup{}
+	var sum int32
+	for i := 0; i < 100; i++ {
+		wait.Add(1)
 		go func() {
 			begin := time.Now()
-			resp, err := client.Create(context.Background(), &User{Name: "ljq", Age: "25"})
-			if err != nil {
-				fmt.Println("请求失败 ", err)
-			} else {
-				fmt.Printf("返回结果[%s] 耗时[%v]\n",
-					resp.Message, time.Since(begin))
-			}
+			_, _ = client.Create(context.Background(), &User{Name: "ljq", Age: "25"})
+			//fmt.Printf("返回结果[%s] 耗时[%v]\n", resp.Message, time.Since(begin))
+			atomic.AddInt32(&sum, int32(time.Since(begin)))
+			wait.Done()
 		}()
 	}
-
-
+	wait.Wait()
+	sum = sum / 100
+	fmt.Println("gRpc耗时 ", time.Duration(sum))
 }

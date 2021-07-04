@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"net/rpc"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -43,11 +45,21 @@ func NewClient() {
 }
 
 func TRpcTest() {
-	for i := 0; i < 10; i++ {
-		var args = Args{In:"tcp test"}
-		var reply Reply
-		begin := time.Now()
-		client.Call("RpcHandle.RpcFunc", &args, &reply)
-		fmt.Printf("返回结果[%s] 耗时[%v]\n", reply.Out, time.Since(begin))
+	wait := sync.WaitGroup{}
+	var sum int32
+	for i := 0; i < 100; i++ {
+		wait.Add(1)
+		go func() {
+			var args = Args{In:"tcp test"}
+			var reply Reply
+			begin := time.Now()
+			client.Call("RpcHandle.RpcFunc", &args, &reply)
+			//fmt.Printf("返回结果[%s] 耗时[%v]\n", reply.Out, time.Since(begin))
+			atomic.AddInt32(&sum, int32(time.Since(begin)))
+			wait.Done()
+		}()
 	}
+	wait.Wait()
+	sum = sum / 100
+	fmt.Println("tRpc耗时 ", time.Duration(sum))
 }
